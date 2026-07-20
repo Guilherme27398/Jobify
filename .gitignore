@@ -1,0 +1,25 @@
+# Credenciais — nunca commitar
+.env
+*.env
+!.env.example
+
+# Screenshots soltos na raiz
+*.png
+*.jpg
+
+# Python (scraper)
+__pycache__/
+*.pyc
+.venv/
+
+# Java (api)
+target/
+*.class
+
+# Node (frontend)
+node_modules/
+dist/
+
+# IDEs
+.idea/
+.vscode/
