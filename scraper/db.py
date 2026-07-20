@@ -18,6 +18,7 @@ Uso como script — teste end-to-end real (scrape + normaliza + escreve):
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from pathlib import Path
 
 import psycopg
@@ -25,6 +26,9 @@ from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = "linkedin"
+
+# Regra da Fase 0: vaga não vista em N execuções consecutivas do seu setor → inativa.
+MISS_THRESHOLD = 3
 
 
 def connect() -> psycopg.Connection:
@@ -85,6 +89,39 @@ class DbWriter:
             run_id = cur.fetchone()[0]
         self.conn.commit()
         return run_id
+
+    def now(self) -> datetime:
+        """Timestamp do lado da BD (para comparar com last_seen_at sem risco de clock skew)."""
+        with self.conn.cursor() as cur:
+            cur.execute("select now()")
+            return cur.fetchone()[0]
+
+    def mark_inactive(self, sector_slug: str, seen_since: datetime) -> tuple[int, int]:
+        """Incrementa os misses das vagas ativas do setor não vistas nesta passagem.
+
+        Chamar só depois de uma passagem BEM-SUCEDIDA pelo setor: uma vaga cujo
+        last_seen_at seja anterior a `seen_since` não apareceu nesta execução, logo
+        soma 1 miss; ao atingir MISS_THRESHOLD fica inativa. Reaparecer (no upsert de
+        write_jobs) repõe is_active=true e consecutive_misses=0.
+
+        Devolve (nº de vagas que somaram miss, nº de vagas desativadas agora).
+        """
+        with self.conn.cursor() as cur:
+            sector_id = self._sector_id(cur, sector_slug)
+            cur.execute(
+                """
+                update jobs
+                set consecutive_misses = consecutive_misses + 1,
+                    is_active = (consecutive_misses + 1 < %s),
+                    updated_at = now()
+                where sector_id = %s and is_active = true and last_seen_at < %s
+                returning (consecutive_misses >= %s) as deactivated
+                """,
+                (MISS_THRESHOLD, sector_id, seen_since, MISS_THRESHOLD),
+            )
+            rows = cur.fetchall()
+        self.conn.commit()
+        return (len(rows), sum(1 for (deactivated,) in rows if deactivated))
 
     def finish_run(self, run_id, status: str, jobs_found: int, jobs_new: int, error: str | None = None) -> None:
         with self.conn.cursor() as cur:

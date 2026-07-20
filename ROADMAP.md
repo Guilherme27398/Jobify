@@ -25,17 +25,17 @@ A ordem segue o fluxo dos dados: primeiro a base de dados (o ponto de contacto e
 
 **Feito quando:** consegues ligar-te à BD com um cliente SQL e as tabelas e seeds estão lá. ✅ (`scraper/check_db.py` liga e vê 3 setores + 18 skills)
 
-## Fase 2 — Scraper (Python)
+## Fase 2 — Scraper (Python) ✅ (2026-07-20)
 
 - [x] Criar `scraper/` com ambiente próprio — venv Python 3.11 em `scraper/.venv`, `requirements.txt` com versões fixas (playwright 1.61, pandas 3.0, psycopg 3.3, python-dotenv, pyyaml), Chromium do Playwright instalado; `scraper/check_db.py` verifica a ligação à BD
 - [x] Implementar o dicionário de queries por setor — `scraper/queries.yml` (13 queries nos 3 setores, skills com aliases para matching, `common_skills` transversais) + `scraper/queries.py` (loader que valida a estrutura e cruza slugs/skills/types com a BD)
 - [x] Scraping do LinkedIn com Playwright — `scraper/linkedin.py`: listagem pública guest (paginada, sem login) + página de cada vaga; extrai external_id, título, empresa, localização, URL, descrição e senioridade/contrato em bruto; pausas aleatórias entre pedidos e tolerância à authwall. Testado com vagas reais em 2026-07-20
 - [x] Normalização com Pandas — `scraper/normalize.py`: dedup por (source, external_id), descarte de linhas sem campos obrigatórios, mapeamento de rótulos PT/EN do LinkedIn para os enums da BD (seniority/contract/remote), distrito a partir da localização, parsing best-effort de salários em EUR e extração de skills (com `\b` para evitar falsos positivos) contra a taxonomia do setor. Validado em `--demo` em 2026-07-20
 - [x] Escrita no Supabase — `scraper/db.py` (DbWriter): upsert de companies (por nome, via `db/fixes_2.sql`) e jobs (por source+external_id, sector só na 1ª vez, reaparecer repõe is_active/consecutive_misses), append em job_snapshots, job_skills e ciclo start/finish em scrape_runs. Upsert provado com `scraper/verify_upsert.py` (jobs estáveis, new=0, snapshot +1, setor inalterado); verificação SQL em `db/tests/verificacao_escrita.sql`
-- [ ] Marcar vagas inativas segundo a regra da Fase 0
-- [ ] Execução agendada: começar com um simples cron/Task Scheduler a chamar `python -m scraper`; Celery + Redis só se vier a ser preciso
+- [x] Marcar vagas inativas segundo a regra da Fase 0 — `DbWriter.mark_inactive`: incrementa `consecutive_misses` das vagas ativas do setor não vistas na passagem; ao atingir 3 → `is_active=false`; reaparecer reativa. Só corre se a passagem pelo setor trouxe vagas (não desativa tudo num bloqueio). Provado com `scraper/verify_inactive.py`
+- [x] Execução agendada — orquestrador `scraper/run.py` + `python -m scraper` (`__main__.py`/`__init__.py`): percorre o `queries.yml`, uma `scrape_run` por query, marcação de inativas por setor no fim. Testado com `python -m scraper --sectors saude` (9 vagas reais escritas). Falta só agendar em produção (Task Scheduler local ou cron/GitHub Actions) → Fase 5
 
-**Feito quando:** duas execuções seguidas do scraper produzem vagas reais na BD, sem duplicados, com dois snapshots por vaga e duas linhas em `scrape_runs`.
+**Feito quando:** duas execuções seguidas do scraper produzem vagas reais na BD, sem duplicados, com dois snapshots por vaga e duas linhas em `scrape_runs`. ✅ (upsert e histórico de snapshots provados por `verify_upsert.py`; BD com 15 vagas reais em 3 execuções)
 
 ## Fase 3 — API (Java / Spring Boot)
 
