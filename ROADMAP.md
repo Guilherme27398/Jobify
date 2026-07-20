@@ -14,21 +14,21 @@ A ordem segue o fluxo dos dados: primeiro a base de dados (o ponto de contacto e
 
 **Feito quando:** as três decisões estão registadas no README. ✅
 
-## Fase 1 — Base de dados (Supabase)
+## Fase 1 — Base de dados (Supabase) ✅ (2026-07-20)
 
 - [x] Criar o projeto no [Supabase](https://supabase.com) (região europeia)
 - [x] Schema aplicado na BD (schema pré-existente do utilizador + `db/fixes.sql` com dedup, `consecutive_misses`, `district`, RLS). `db/schema.sql` é a fotografia fiel da BD e a futura baseline do Flyway
 - [x] Criar os índices de leitura (bloco "Índices" do `db/schema.sql`)
 - [x] Aplicar `db/seed.sql`: 3 setores (tecnologia, advocacia, saúde) e as 18 skills iniciais da taxonomia
 - [x] Verificação completa da BD com `db/tests/verificacao_fase1.sql` — tudo OK em 2026-07-20
-- [ ] Guardar as credenciais no `.env` (a partir do `.env.example`): connection string do **session pooler** (porta 5432; funciona em IPv4, serve o scraper e a API via JDBC) — **não** usar o transaction pooler (porta 6543) com JDBC. Password antiga foi exposta → fazer reset no Supabase antes
+- [x] Credenciais no `.env` da raiz (`DATABASE_URL`). Nota: em uso a ligação direta (funciona localmente via IPv6); no deploy da API/scraper usar o **session pooler** (porta 5432) — **não** usar o transaction pooler (porta 6543) com JDBC
 
-**Feito quando:** consegues ligar-te à BD com um cliente SQL e as tabelas e seeds estão lá.
+**Feito quando:** consegues ligar-te à BD com um cliente SQL e as tabelas e seeds estão lá. ✅ (`scraper/check_db.py` liga e vê 3 setores + 18 skills)
 
 ## Fase 2 — Scraper (Python)
 
-- [ ] Criar `scraper/` com ambiente próprio (`uv` ou `venv` + `requirements.txt`): Playwright, Pandas, driver Postgres (`psycopg`)
-- [ ] Implementar o dicionário de queries por setor (decisão da Fase 0)
+- [x] Criar `scraper/` com ambiente próprio — venv Python 3.11 em `scraper/.venv`, `requirements.txt` com versões fixas (playwright 1.61, pandas 3.0, psycopg 3.3, python-dotenv, pyyaml), Chromium do Playwright instalado; `scraper/check_db.py` verifica a ligação à BD
+- [x] Implementar o dicionário de queries por setor — `scraper/queries.yml` (13 queries nos 3 setores, skills com aliases para matching, `common_skills` transversais) + `scraper/queries.py` (loader que valida a estrutura e cruza slugs/skills/types com a BD)
 - [ ] Scraping do LinkedIn com Playwright: dada uma query, extrair título, empresa, localização, URL, `external_id`, texto da vaga
 - [ ] Normalização com Pandas: duplicados por `(source, external_id)`, campos em falta, parsing de salários (EUR), extração de skills contra a taxonomia do setor
 - [ ] Escrita no Supabase: upsert de `companies` e `jobs` (setor = setor da query, só na primeira vez), append em `job_snapshots`, registo em `scrape_runs`
