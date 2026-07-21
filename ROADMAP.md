@@ -55,7 +55,7 @@ A ordem segue o fluxo dos dados: primeiro a base de dados (o ponto de contacto e
 
 ## Fase 4 — Frontend (React)
 
-- [ ] Criar `frontend/` com Vite + React + TypeScript
+- [x] Criar `frontend/` com Vite + React + TypeScript
 - [ ] Página de pesquisa: seletor de setor → carrega os filtros de `GET /sectors/:slug/filters` → lista de vagas de `GET /jobs` com paginação
 - [ ] Dashboard com Recharts: vagas por setor, evolução salarial (com a nota de % de cobertura), distribuição geográfica
 - [ ] Estados de loading/erro/vazio em todas as chamadas à API
