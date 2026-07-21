@@ -39,17 +39,17 @@ A ordem segue o fluxo dos dados: primeiro a base de dados (o ponto de contacto e
 
 ## Fase 3 — API (Java / Spring Boot)
 
-- [ ] Gerar o projeto em `api/` com [start.spring.io](https://start.spring.io): Java 21, Maven, dependências Spring Web, Spring Data JPA, Flyway, driver PostgreSQL
-- [ ] Configurar a ligação ao Supabase (`application.yml` com variáveis de ambiente; nunca credenciais no código)
-- [ ] Migração Flyway `V1__baseline.sql` com o schema existente, para as migrações futuras ficarem versionadas
-- [ ] Entidades JPA + repositories para as tabelas de leitura (`sectors`, `jobs`, `skills`, `job_snapshots`, …)
-- [ ] Endpoints, com DTOs próprios (nunca expor entidades):
-  - [ ] `GET /sectors`
-  - [ ] `GET /sectors/:slug/filters` — filtros derivados dos dados reais (skills, senioridades, tipos de contrato existentes)
-  - [ ] `GET /jobs` — filtros combináveis via JPA Specifications, paginação, inativas excluídas por omissão
-  - [ ] `GET /stats/:sector` — vagas ao longo do tempo, evolução salarial (só vagas com salário + % de cobertura), distribuição geográfica
-- [ ] CORS configurado para o domínio do frontend
-- [ ] Testes de integração dos endpoints (Testcontainers com Postgres)
+- [x] Gerar o projeto em `api/` com [start.spring.io](https://start.spring.io): Java 21, Maven, dependências Spring Web, Spring Data JPA, Flyway, driver PostgreSQL
+- [x] Configurar a ligação ao Supabase (`application.yml` com variáveis de ambiente; nunca credenciais no código)
+- [x] Migração Flyway `V1__baseline.sql` com o schema existente, para as migrações futuras ficarem versionadas
+- [x] Entidades JPA + repositories para as tabelas de leitura (`sectors`, `jobs`, `skills`, `job_snapshots`, …)
+- [x] Endpoints, com DTOs próprios (nunca expor entidades):
+  - [x] `GET /sectors`
+  - [x] `GET /sectors/:slug/filters` — filtros derivados dos dados reais (skills, senioridades, tipos de contrato existentes)
+  - [x] `GET /jobs` — filtros combináveis via JPA Specifications, paginação, inativas excluídas por omissão
+  - [x] `GET /stats/:sector` — vagas ao longo do tempo, evolução salarial (só vagas com salário + % de cobertura), distribuição geográfica
+- [x] CORS configurado para o domínio do frontend
+- [x] Testes de integração dos endpoints (Testcontainers com Postgres)
 
 **Feito quando:** com a BD populada pelo scraper, os quatro endpoints respondem corretamente e os testes passam.
 
