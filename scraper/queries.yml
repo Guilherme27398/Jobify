@@ -1,0 +1,91 @@
+# Dicionário de queries por setor (decisão da Fase 0).
+# É a fonte de verdade do que o scraper pesquisa e de como classifica o setor:
+# cada vaga fica com o setor da query que a encontrou (na primeira vez que é vista).
+#
+# Regras:
+# - as chaves de `sectors` têm de ser slugs existentes na tabela `sectors`
+# - os nomes em `expected_skills`/`common_skills` têm de existir na tabela `skills`
+#   (validar com: scraper/.venv/Scripts/python scraper/queries.py)
+# - `aliases` são grafias alternativas usadas no matching contra o texto da vaga
+
+defaults:
+  location: "Portugal"
+
+# Skills transversais, procuradas nas vagas de todos os setores.
+common_skills:
+  - name: "Inglês"
+    type: language
+    aliases: ["english"]
+  - name: "Comunicação"
+    type: soft_skill
+    aliases: ["communication"]
+  - name: "Trabalho em Equipa"
+    type: soft_skill
+    aliases: ["teamwork", "trabalho em equipa"]
+
+sectors:
+  tecnologia:
+    queries:
+      - "software engineer"
+      - "backend developer"
+      - "java spring boot"
+      - "frontend developer react"
+      - "python developer"
+      - "full stack developer"
+    expected_skills:
+      - name: "Java"
+        type: technical
+      - name: "Spring Boot"
+        type: technical
+        aliases: ["spring-boot", "springboot"]
+      - name: "Python"
+        type: technical
+      - name: "TypeScript"
+        type: technical
+      - name: "React"
+        type: technical
+        aliases: ["react.js", "reactjs"]
+      - name: "SQL"
+        type: technical
+        aliases: ["postgresql", "mysql"]
+      - name: "Docker"
+        type: technical
+      - name: "AWS"
+        type: technical
+        aliases: ["amazon web services"]
+
+  advocacia:
+    queries:
+      - "advogado"
+      - "jurista"
+      - "advogado direito laboral"
+      - "legal counsel"
+    expected_skills:
+      - name: "Direito Laboral"
+        type: legal
+        aliases: ["direito do trabalho", "labor law"]
+      - name: "Direito Fiscal"
+        type: legal
+        aliases: ["tax law"]
+      - name: "Direito Comercial"
+        type: legal
+        aliases: ["direito das sociedades", "corporate law"]
+      - name: "Contencioso"
+        type: legal
+        aliases: ["litigation"]
+
+  saude:
+    queries:
+      - "enfermeiro"
+      - "enfermeiro cuidados intensivos"
+      - "enfermeiro geriatria"
+    expected_skills:
+      - name: "Enfermagem Geral"
+        type: certification
+        aliases: ["enfermagem"]
+      - name: "Cuidados Intensivos"
+        type: technical
+        aliases: ["uci", "intensive care"]
+      - name: "Geriatria"
+        type: technical
+        aliases: ["geriatric care"]
