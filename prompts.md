@@ -1,0 +1,152 @@
+# Prompts para geração de assets Higgsfield
+
+Prompts prontos para gerar as **2 imagens** e o **vídeo** do hero da landing page. Escritos em inglês porque os modelos de IA geram melhores resultados com inglês.
+
+Regra de ouro: o **mesmo personagem** aparece nas três peças — 28 anos, traços do sul da Europa, cabelo escuro médio. A progressão visual vai de **frio/escuro/defeito** para **quente/luminoso/vitória**.
+
+---
+
+## 🎬 Vídeo do hero (scroll-driven)
+
+**Modelo sugerido:** `kling3_0_turbo` (rápido, ~8s) ou `seedance_2_0` (mais coerente com o personagem).
+**Aspect ratio:** `16:9`
+**Duração:** 8 segundos
+
+**Prompt:**
+```
+Cinematic 8-second continuous sequence.
+
+OPENS 0-2s: Close-up of a young professional (28 years old, Southern European
+features, medium-length dark hair, casual worn t-shirt), hunched over a laptop
+in a dim cluttered apartment at 2AM. Only the cold blue glow of the screen
+lights their face. Exhausted, defeated expression. Empty coffee cups and
+crumpled paper visible around them. They scroll through job rejection emails.
+
+TRANSITION 2-4s: On the laptop screen, a soft bright glow appears — a new
+Jobify notification with a job offer. The blue light on their face begins
+shifting subtly warmer. Their brow furrows in confusion, then their eyes widen.
+
+TRANSFORMATION 4-6s: Camera slowly pushes in on their face. Expression shifts
+from disbelief to dawning realization. Hand covers their mouth. Tears of joy
+begin welling up in their eyes.
+
+CLIMAX 6-8s: They lean back in their chair with a genuine breaking smile. Warm
+golden morning light gradually replaces the cold blue glow, as if dawn is
+arriving. Their face is now bathed in soft warm light.
+
+Style: cinematic 35mm film aesthetic, handheld intimate camera, shallow depth
+of field, natural imperfect skin, no text overlays, no dialogue, no captions.
+Emotional storytelling through pure visual language. Muted color palette that
+gradually warms.
+```
+
+**Onde colocar depois de gerado:**
+- Guarda o ficheiro em `frontend/public/hero.mp4`
+- Em `frontend/src/App.tsx` altera para: `<ScrollVideoHero videoSrc="/hero.mp4" />`
+
+---
+
+## 🖼️ Imagem 1 — "Antes" (desemprego)
+
+**Modelo sugerido:** `soul_2` (portraits realistas) ou `nano_banana_pro` (4K, alta fidelidade).
+**Aspect ratio:** `16:9` ou `4:3`
+
+**Prompt:**
+```
+Cinematic close-up portrait of a young professional, 28 years old, Southern
+European features, medium-length dark hair (slightly unkempt), sitting at a
+cluttered wooden desk in a dim studio apartment at 2AM.
+
+The face is lit only by the cold blue glow of a laptop screen. Expression:
+exhaustion, frustration, quiet defeat. Dark circles under the eyes. Slumped
+shoulders. One hand rubbing the temple.
+
+Environment: empty coffee cups, crumpled paper, an energy drink can, scattered
+notes on the desk. The laptop screen (visible from the side) shows multiple
+job rejection emails and closed application tabs.
+
+Style: cinematic 35mm film photography, moody blue-grey color palette, deep
+shadows, heavy vignette, shallow depth of field, natural imperfect skin. Raw
+emotional atmosphere. No text overlays.
+```
+
+**Onde colocar:**
+- Guarda em `frontend/public/before.jpg`
+- Em `App.tsx`: `<BeforeAfter imageBefore="/before.jpg" imageAfter="/after.jpg" />`
+
+---
+
+## 🖼️ Imagem 2 — "Depois" (com Jobify)
+
+**Modelo sugerido:** `soul_2` ou `nano_banana_pro` (usa o mesmo modelo da imagem 1 para consistência do personagem).
+**Aspect ratio:** igual à imagem 1 (`16:9` ou `4:3`)
+
+**Prompt:**
+```
+Cinematic close-up portrait of the SAME young professional as before — 28 years
+old, Southern European features, medium-length dark hair (now well-groomed),
+wearing a clean casual button-up shirt. Now sitting at a tidy, well-organized
+desk in a bright modern apartment during morning golden hour.
+
+Warm sunlight streams through a window behind them. Face lit up with genuine
+joy and disbelief: mouth slightly open in a breaking smile, eyes shining with
+emotion, one hand covering the mouth in happy shock, the other hand raised in
+a small victorious fist near the shoulder.
+
+Environment: the laptop screen (visible from the side) shows a job offer
+letter with visible text "Congratulations! You are hired." A fresh coffee
+in a clean ceramic mug, an open notebook, a small plant on the desk.
+
+Style: cinematic 35mm film photography, warm golden color palette (creams,
+soft peach, honey tones), soft natural light, shallow depth of field, natural
+imperfect skin. Emotionally uplifting atmosphere. Same character identity,
+framing and camera angle as the "before" photo (consistency is critical).
+```
+
+---
+
+## 🎯 Dicas para consistência de personagem
+
+Se as duas imagens saírem com pessoas visivelmente diferentes, tenta estas abordagens:
+
+1. **Reference image** — usa a primeira imagem gerada como `medias[]` com role `character_reference` (se o modelo suportar) na segunda geração.
+
+2. **Soul training (Higgsfield)** — se planeas usar o mesmo personagem repetidamente, treina um Soul com 5-20 fotos de referência via `show_characters(action='train')`. Depois usas `soul_2` + `soul_id` para gerar sempre o mesmo personagem.
+
+3. **Descrição fixa** — copia literalmente a descrição física ("28 years old, Southern European features, medium-length dark hair") em todos os prompts.
+
+4. **Seed determinístico** — se o modelo aceitar `seed`, usa o mesmo valor nas 3 gerações.
+
+---
+
+## 📏 Especificações técnicas
+
+| Asset | Aspect Ratio | Resolução | Duração | Tamanho máx. razoável |
+|-------|-------------|-----------|---------|----------------------|
+| Vídeo hero | 16:9 | 1920×1080 | 8s | ~15 MB (H.264) |
+| Imagem "Antes" | 16:9 | 1920×1080 | — | ~500 KB (JPEG q80) |
+| Imagem "Depois" | 16:9 | 1920×1080 | — | ~500 KB (JPEG q80) |
+
+**Para optimizar o vídeo depois de gerado**, se ficar demasiado pesado:
+```bash
+ffmpeg -i hero.mp4 -c:v libx264 -crf 28 -preset slow -an -movflags +faststart frontend/public/hero.mp4
+```
+
+O `-an` remove o áudio (não é preciso, o vídeo é scroll-driven silencioso) e `+faststart` põe os metadados no início para começar a tocar antes do download completo.
+
+---
+
+## 🔄 Fluxo completo após ter o plano Higgsfield
+
+1. Copia os 3 prompts para o Higgsfield (via MCP ou UI web).
+2. Gera as 2 imagens **primeiro** (mais rápido, ~15s cada).
+3. Se o personagem não ficar consistente entre as duas, retreina ou ajusta a descrição.
+4. Gera o vídeo com o modelo escolhido (~2-3 min).
+5. Optimiza o vídeo com o `ffmpeg` acima.
+6. Coloca os 3 ficheiros em `frontend/public/`.
+7. Actualiza `App.tsx` para passar os props:
+   ```tsx
+   <ScrollVideoHero videoSrc="/hero.mp4" />
+   <BeforeAfter imageBefore="/before.jpg" imageAfter="/after.jpg" />
+   ```
+8. `npm run dev` e valida no browser.
