@@ -26,6 +26,7 @@ public class JobController {
 
     @GetMapping
     public PageResponse<JobDto> list(
+            @RequestParam(required = false) String q,
             @RequestParam(required = false) String sector,
             @RequestParam(required = false) List<UUID> skillId,
             @RequestParam(required = false) String seniority,
@@ -33,6 +34,11 @@ public class JobController {
             @RequestParam(required = false) String remoteType,
             @RequestParam(required = false) String district,
             @PageableDefault(size = 20, sort = "lastSeenAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return jobService.findAll(sector, skillId, seniority, contractType, remoteType, district, pageable);
+        return jobService.findAll(q, sector, skillId, seniority, contractType, remoteType, district, pageable);
+    }
+
+    @GetMapping("/districts")
+    public List<String> districts() {
+        return jobService.findDistricts();
     }
 }

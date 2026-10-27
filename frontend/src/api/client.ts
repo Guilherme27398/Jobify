@@ -1,4 +1,4 @@
-import type { Filters, JobsQuery, PageResponse, Job, Sector, StatsDto } from './types';
+import type { Filters, HomeStats, JobsQuery, PageResponse, Job, Sector, StatsDto } from './types';
 
 const BASE = '/api';
 
@@ -14,8 +14,17 @@ export function getSectors(): Promise<Sector[]> {
   return get<Sector[]>('/sectors');
 }
 
+/** Distritos com vagas ativas em todas as áreas. */
+export function getDistricts(): Promise<string[]> {
+  return get<string[]>('/jobs/districts');
+}
+
 export function getSectorFilters(slug: string): Promise<Filters> {
   return get<Filters>(`/sectors/${encodeURIComponent(slug)}/filters`);
+}
+
+export function getHomeStats(): Promise<HomeStats> {
+  return get<HomeStats>('/stats/home');
 }
 
 export function getStats(slug: string): Promise<StatsDto> {
@@ -24,6 +33,7 @@ export function getStats(slug: string): Promise<StatsDto> {
 
 export function getJobs(query: JobsQuery): Promise<PageResponse<Job>> {
   const params = new URLSearchParams();
+  if (query.q)            params.set('q', query.q);
   if (query.sector)       params.set('sector', query.sector);
   if (query.seniority)    params.set('seniority', query.seniority);
   if (query.contractType) params.set('contractType', query.contractType);

@@ -25,6 +25,7 @@ public class JobSnapshot {
     private BigDecimal salaryMin;
     private BigDecimal salaryMax;
     private String salaryCurrency;
+    private String salaryPeriod; // 'month' | 'year' | null
     private OffsetDateTime recordedAt;
 
     protected JobSnapshot() {}
@@ -38,5 +39,6 @@ public class JobSnapshot {
     public BigDecimal getSalaryMin()     { return salaryMin; }
     public BigDecimal getSalaryMax()     { return salaryMax; }
     public String getSalaryCurrency()    { return salaryCurrency; }
+    public String getSalaryPeriod()      { return salaryPeriod; }
     public OffsetDateTime getRecordedAt() { return recordedAt; }
 }

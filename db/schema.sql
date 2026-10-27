@@ -101,6 +101,7 @@ create table job_snapshots (
   salary_min      numeric,
   salary_max      numeric,
   salary_currency text default 'EUR',
+  salary_period   text check (salary_period in ('month', 'year')),  -- V2 (Flyway)
   recorded_at     timestamptz not null default now(),
   check (salary_min is null or salary_max is null or salary_min <= salary_max)
 );

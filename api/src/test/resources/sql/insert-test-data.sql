@@ -39,10 +39,10 @@ VALUES ('44444444-0000-0000-0000-000000000001', '33333333-0000-0000-0000-0000000
 
 -- Snapshots da vaga ativa de tecnologia:
 -- Mês anterior com salário
-INSERT INTO job_snapshots (id, job_id, seniority, contract_type, remote_type, salary_min, salary_max, recorded_at)
+INSERT INTO job_snapshots (id, job_id, seniority, contract_type, remote_type, salary_min, salary_max, salary_period, recorded_at)
 VALUES ('55555555-0000-0000-0000-000000000001',
         '44444444-0000-0000-0000-000000000001',
-        'senior', 'full_time', 'hybrid', 3000, 4500,
+        'senior', 'full_time', 'hybrid', 3000, 4500, 'month',
         date_trunc('month', now()) - interval '1 month');
 
 -- Mês atual sem salário

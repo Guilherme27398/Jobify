@@ -1,5 +1,6 @@
 package com.jobify.api.service;
 
+import com.jobify.api.dto.HomeStatsDto;
 import com.jobify.api.dto.StatsDto;
 import com.jobify.api.entity.Sector;
 import com.jobify.api.repository.JobRepository;
@@ -11,11 +12,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
 public class StatsService {
+
+    private static final int TOP_SKILLS = 10;
+    private static final int TOP_COMPANIES = 8;
 
     private final SectorRepository sectorRepository;
     private final JobRepository jobRepository;
@@ -27,6 +33,15 @@ public class StatsService {
         this.sectorRepository = sectorRepository;
         this.jobRepository = jobRepository;
         this.jobSnapshotRepository = jobSnapshotRepository;
+    }
+
+    public HomeStatsDto getHomeStats() {
+        OffsetDateTime weekAgo = OffsetDateTime.now().minusDays(7);
+        return new HomeStatsDto(
+                jobRepository.countByActiveTrue(),
+                jobRepository.countActiveCompanies(),
+                jobRepository.countNewSince(weekAgo),
+                jobRepository.findLastSeenAt());
     }
 
     public StatsDto getStats(String slug) {
@@ -54,6 +69,21 @@ public class StatsService {
                 .map(row -> new StatsDto.DistrictCount((String) row[0], ((Number) row[1]).longValue()))
                 .toList();
 
-        return new StatsDto(jobsOverTime, salaryEvolution, salaryCoverage, districtDistribution);
+        UUID sectorId = sector.getId();
+        return new StatsDto(
+                jobRepository.countBySector_IdAndActiveTrue(sectorId),
+                jobsOverTime,
+                salaryEvolution,
+                salaryCoverage,
+                districtDistribution,
+                toNamedCounts(jobRepository.topSkills(sectorId, TOP_SKILLS)),
+                toNamedCounts(jobRepository.topCompanies(sectorId, TOP_COMPANIES)),
+                toNamedCounts(jobRepository.remoteTypeDistribution(sectorId)));
+    }
+
+    private static List<StatsDto.NamedCount> toNamedCounts(List<Object[]> rows) {
+        return rows.stream()
+                .map(row -> new StatsDto.NamedCount((String) row[0], ((Number) row[1]).longValue()))
+                .toList();
     }
 }

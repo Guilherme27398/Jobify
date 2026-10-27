@@ -1,5 +1,6 @@
 package com.jobify.api.controller;
 
+import com.jobify.api.dto.HomeStatsDto;
 import com.jobify.api.dto.StatsDto;
 import com.jobify.api.service.StatsService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,11 @@ public class StatsController {
 
     public StatsController(StatsService statsService) {
         this.statsService = statsService;
+    }
+
+    @GetMapping("/home")
+    public HomeStatsDto home() {
+        return statsService.getHomeStats();
     }
 
     @GetMapping("/{slug}")

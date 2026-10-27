@@ -78,6 +78,11 @@ public final class JobSpecifications {
         };
     }
 
+    public static Specification<Job> titleContains(String text) {
+        String pattern = "%" + text.toLowerCase() + "%";
+        return (root, query, cb) -> cb.like(cb.lower(root.get("title")), pattern);
+    }
+
     public static Specification<Job> inDistrict(String district) {
         return (root, query, cb) -> cb.equal(root.get("district"), district);
     }

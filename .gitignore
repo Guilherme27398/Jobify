@@ -3,14 +3,15 @@
 *.env
 !.env.example
 
-# Screenshots soltos na raiz
-*.png
-*.jpg
+# Screenshots soltos na raiz (só na raiz: as imagens do site, em frontend/, têm de ser versionadas)
+/*.png
+/*.jpg
 
 # Python (scraper)
 __pycache__/
 *.pyc
 .venv/
+scraper/logs/
 
 # Java (api)
 target/
@@ -23,3 +24,14 @@ dist/
 # IDEs
 .idea/
 .vscode/
+
+# Extensão Local History do VS Code: guarda cópias dos ficheiros editados, incluindo o .env
+.history/
+
+# Ferramentas de IA (skills e configuração local do Claude Code): não vão para o GitHub
+.agents/
+.claude/
+skills-lock.json
+
+# Originais de vídeo com marca de água; o vídeo do site é frontend/public/hero-jobify.mp4
+frontend/public/dreamina-*.mp4

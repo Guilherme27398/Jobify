@@ -1,76 +1,35 @@
 const STEPS = [
   {
-    num: '01',
-    title: 'Scraper agrega',
-    body: 'Um scraper Python corre automaticamente, recolhendo vagas do LinkedIn por setor e normalizando os dados — salário, localização, seniority, skills.',
+    title: 'Juntamos as vagas',
+    body: 'Todos os dias reunimos as vagas publicadas na internet num só lugar, organizadas por área de trabalho e sem duplicados.',
   },
   {
-    num: '02',
-    title: 'API filtra',
-    body: 'A API Spring Boot expõe endpoints com filtros combináveis derivados dos dados reais: por skills existentes, tipo de contrato, regime remoto e distrito.',
+    title: 'Escolhes o que procuras',
+    body: 'Filtras por área, localização, tipo de contrato e pelo que sabes fazer. Só aparecem opções que existem de facto.',
   },
   {
-    num: '03',
-    title: 'Tu decides',
-    body: 'Escolhes setor, aplicas filtros e vês vagas ativas ordenadas por data. Sem duplicados, sem vagas encerradas — só o que importa.',
+    title: 'Candidatas-te com confiança',
+    body: 'Vês apenas vagas ainda abertas, das mais recentes para as mais antigas. Sem perder tempo com vagas já fechadas.',
   },
 ];
 
 export default function HowItWorks() {
   return (
-    <section style={{
-      padding: '120px 2rem',
-      background: 'var(--surface)',
-      borderTop: '1px solid var(--border)',
-      borderBottom: '1px solid var(--border)',
-    }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <p style={{ fontSize: 12, letterSpacing: 4, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 20 }}>
-          Como funciona
-        </p>
-        <h2 style={{
-          fontSize: 'clamp(2rem, 4vw, 3rem)',
-          fontWeight: 800, letterSpacing: '-2px',
-          color: 'var(--text)', marginBottom: 80,
-        }}>
-          Três camadas.<br />Um resultado.
-        </h2>
+    <section className="page-section">
+      <p className="eyebrow">Como funciona</p>
+      <h2 className="section-title" style={{ marginBottom: 72 }}>
+        Três passos.<br />Zero vagas fechadas.
+      </h2>
 
-        <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          {STEPS.map((step, i) => (
-            <div key={i} style={{
-              flex: 1, minWidth: 240,
-              padding: '40px 36px',
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: i === 0 ? '24px 0 0 24px' : i === 2 ? '0 24px 24px 0' : 0,
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{
-                position: 'absolute', top: -10, right: 16,
-                fontSize: 80, fontWeight: 900,
-                color: 'rgba(255,255,255,0.02)',
-                letterSpacing: -4, lineHeight: 1,
-                userSelect: 'none',
-              }}>
-                {step.num}
-              </div>
-              <div style={{
-                fontSize: 13, fontWeight: 700, color: 'var(--accent)',
-                marginBottom: 16, letterSpacing: 1,
-              }}>
-                {step.num}
-              </div>
-              <h3 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>
-                {step.title}
-              </h3>
-              <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.7 }}>
-                {step.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ol className="steps">
+        {STEPS.map((step, i) => (
+          <li key={step.title} className="step">
+            <span className="step-num">{i + 1}</span>
+            <h3 className="step-title">{step.title}</h3>
+            <p className="step-body">{step.body}</p>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

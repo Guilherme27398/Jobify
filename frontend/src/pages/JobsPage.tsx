@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
-import { getSectors, getSectorFilters, getJobs } from '../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { getSectors, getSectorFilters, getJobs, getDistricts } from '../api/client';
 import type { Sector, Filters, Job, PageResponse } from '../api/types';
+import { FiltersSkeleton, ResultsSkeleton, SectorPillsSkeleton } from '../components/JobsSkeletons';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const PAGE_SIZE = 20;
 
@@ -41,18 +43,18 @@ const Select: React.FC<{
   </select>
 );
 
-/* ── Sector pills ── */
+/* ── Sector pills ("Todas" = sem filtro de área) ── */
 const SectorPills: React.FC<{
   sectors: Sector[];
   selected: string;
   onSelect: (slug: string) => void;
 }> = ({ sectors, selected, onSelect }) => (
   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-    {sectors.map(s => {
+    {[{ slug: '', name: 'Todas' }, ...sectors].map(s => {
       const active = s.slug === selected;
       return (
         <button
-          key={s.id}
+          key={s.slug || 'all'}
           onClick={() => onSelect(s.slug)}
           style={{
             background: active ? 'var(--gradient)' : 'var(--surface)',
@@ -100,19 +102,20 @@ const SkillChip: React.FC<{
 );
 
 /* ── Job card ── */
-const JobCard: React.FC<{ job: Job }> = ({ job }) => {
+const JobCard: React.FC<{ job: Job; index: number }> = ({ job, index }) => {
   const daysAgo = Math.floor(
     (Date.now() - new Date(job.lastSeenAt).getTime()) / (1000 * 60 * 60 * 24)
   );
   return (
-    <article style={{
+    <article className="job-enter" style={{
+      '--i': Math.min(index, 8),
       border: '1px solid var(--border)',
       borderRadius: 16,
       padding: 24,
       background: 'var(--surface)',
       display: 'flex', flexDirection: 'column', gap: 12,
       transition: 'border-color 0.2s, transform 0.2s',
-    }}
+    } as React.CSSProperties}
       onMouseEnter={e => {
         e.currentTarget.style.borderColor = 'var(--accent)';
         e.currentTarget.style.transform = 'translateY(-2px)';
@@ -169,52 +172,85 @@ const JobCard: React.FC<{ job: Job }> = ({ job }) => {
 };
 
 export default function JobsPage() {
+  /* Filtros vindos do URL (pesquisa da homepage); sem área = todas as áreas. */
+  const [fromUrl] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return { sector: p.get('sector') ?? '', q: p.get('q') ?? '', district: p.get('district') ?? '' };
+  });
+
   const [sectors, setSectors] = useState<Sector[]>([]);
-  const [selectedSector, setSelectedSector] = useState<string>('');
+  const [selectedSector, setSelectedSector] = useState(fromUrl.sector);
+  const [keyword, setKeyword] = useState(fromUrl.q);
+  const debouncedKeyword = useDebouncedValue(keyword, 300);
   const [filters, setFilters] = useState<Filters | null>(null);
+  const [allDistricts, setAllDistricts] = useState<string[]>([]);
 
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [seniority, setSeniority]           = useState('');
   const [contractType, setContractType]     = useState('');
   const [remoteType, setRemoteType]         = useState('');
-  const [district, setDistrict]             = useState('');
+  const [district, setDistrict]             = useState(fromUrl.district);
 
   const [page, setPage] = useState(0);
   const [jobs, setJobs] = useState<PageResponse<Job> | null>(null);
 
   const [loadingSectors, setLoadingSectors] = useState(true);
   const [loadingFilters, setLoadingFilters] = useState(false);
-  const [loadingJobs, setLoadingJobs]       = useState(false);
+  const [loadingJobs, setLoadingJobs]       = useState(true);
   const [error, setError]                   = useState<string | null>(null);
 
   /* ── Load sectors on mount ── */
   useEffect(() => {
     getSectors()
-      .then(s => { setSectors(s); if (s[0]) setSelectedSector(s[0].slug); })
+      .then(s => {
+        setSectors(s);
+        /* Área do URL que não existe → mostra todas. */
+        setSelectedSector(current => (current && !s.some(x => x.slug === current) ? '' : current));
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoadingSectors(false));
   }, []);
 
-  /* ── When sector changes: load filters, reset all filter state ── */
+  /* ── When sector changes: reset filters, then load the sector's filter options ──
+     Compara com a área anterior (e não com "primeira execução") para que o
+     StrictMode não apague os filtros que vieram do URL. */
+  const previousSector = useRef(selectedSector);
   useEffect(() => {
-    if (!selectedSector) return;
-    setLoadingFilters(true);
-    setSelectedSkills([]); setSeniority(''); setContractType('');
-    setRemoteType(''); setDistrict(''); setPage(0);
+    if (previousSector.current !== selectedSector) {
+      previousSector.current = selectedSector;
+      setSelectedSkills([]); setSeniority(''); setContractType('');
+      setRemoteType(''); setDistrict(''); setPage(0);
+    }
 
+    if (!selectedSector) {
+      setFilters(null);
+      setLoadingFilters(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingFilters(true);
     getSectorFilters(selectedSector)
-      .then(setFilters)
-      .catch(e => setError(e.message))
-      .finally(() => setLoadingFilters(false));
+      .then(f => { if (!cancelled) setFilters(f); })
+      .catch(e => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoadingFilters(false); });
+    return () => { cancelled = true; };
   }, [selectedSector]);
 
-  /* ── When filters/page change: fetch jobs ── */
+  /* ── "Todas": só o distrito é filtrável, com os distritos de todas as áreas ── */
   useEffect(() => {
-    if (!selectedSector) return;
+    if (selectedSector || allDistricts.length > 0) return;
+    getDistricts().then(setAllDistricts).catch(() => setAllDistricts([]));
+  }, [selectedSector, allDistricts.length]);
+
+  /* ── When filters/page change: fetch jobs (respostas antigas são ignoradas) ── */
+  useEffect(() => {
+    let cancelled = false;
     setLoadingJobs(true);
     setError(null);
     getJobs({
-      sector: selectedSector,
+      q: debouncedKeyword.trim() || undefined,
+      sector: selectedSector || undefined,
       skillId: selectedSkills.length ? selectedSkills : undefined,
       seniority: seniority || undefined,
       contractType: contractType || undefined,
@@ -223,10 +259,11 @@ export default function JobsPage() {
       page,
       size: PAGE_SIZE,
     })
-      .then(setJobs)
-      .catch(e => setError(e.message))
-      .finally(() => setLoadingJobs(false));
-  }, [selectedSector, selectedSkills, seniority, contractType, remoteType, district, page]);
+      .then(r => { if (!cancelled) setJobs(r); })
+      .catch(e => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoadingJobs(false); });
+    return () => { cancelled = true; };
+  }, [debouncedKeyword, selectedSector, selectedSkills, seniority, contractType, remoteType, district, page]);
 
   const toggleSkill = (id: string) => {
     setPage(0);
@@ -253,23 +290,55 @@ export default function JobsPage() {
           </h1>
         </header>
 
+        {/* ── Palavra-chave ── */}
+        <div style={{ marginBottom: 32 }}>
+          <input
+            value={keyword}
+            onChange={e => { setKeyword(e.target.value); setPage(0); }}
+            placeholder="Pesquisar pelo título da vaga…"
+            style={{
+              width: '100%', maxWidth: 480,
+              background: 'var(--surface)', color: 'var(--text)',
+              border: '1px solid var(--border)', borderRadius: 12,
+              padding: '14px 16px', fontSize: 15, fontFamily: 'inherit',
+            }}
+          />
+        </div>
+
         {/* ── Sector selector ── */}
         <section style={{ marginBottom: 32 }}>
           <Label>Setor</Label>
           {loadingSectors
-            ? <p style={{ color: 'var(--muted)', fontSize: 14 }}>A carregar setores…</p>
+            ? <SectorPillsSkeleton />
             : <SectorPills sectors={sectors} selected={selectedSector} onSelect={setSelectedSector} />
           }
         </section>
 
         {/* ── Filters ── */}
+        {!selectedSector && (
+          <section style={{
+            border: '1px solid var(--border)', borderRadius: 16,
+            padding: 24, marginBottom: 32, background: 'var(--surface)',
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, alignItems: 'end',
+          }}>
+            <div>
+              <Label>Distrito</Label>
+              <Select value={district} onChange={setFilterAndReset(setDistrict)}
+                options={allDistricts} placeholder="Todos" />
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+              Escolhe uma área para filtrar também por skills, seniority, contrato e regime.
+            </p>
+          </section>
+        )}
+
         {selectedSector && (
           <section style={{
             border: '1px solid var(--border)', borderRadius: 16,
             padding: 24, marginBottom: 32, background: 'var(--surface)',
           }}>
             {loadingFilters || !filters
-              ? <p style={{ color: 'var(--muted)', fontSize: 14 }}>A carregar filtros…</p>
+              ? <FiltersSkeleton />
               : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
@@ -316,7 +385,7 @@ export default function JobsPage() {
         )}
 
         {/* ── Results ── */}
-        <section>
+        <section aria-busy={loadingJobs}>
           {error && (
             <div style={{
               padding: 20, borderRadius: 12,
@@ -336,11 +405,7 @@ export default function JobsPage() {
             </p>
           )}
 
-          {loadingJobs && (
-            <p style={{ color: 'var(--muted)', fontSize: 14, padding: '40px 0', textAlign: 'center' }}>
-              A carregar vagas…
-            </p>
-          )}
+          {loadingJobs && <ResultsSkeleton />}
 
           {!loadingJobs && jobs && jobs.content.length === 0 && (
             <div style={{
@@ -354,12 +419,8 @@ export default function JobsPage() {
           )}
 
           {!loadingJobs && jobs && jobs.content.length > 0 && (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: 16,
-            }}>
-              {jobs.content.map(j => <JobCard key={j.id} job={j} />)}
+            <div className="jobs-grid">
+              {jobs.content.map((j, i) => <JobCard key={j.id} job={j} index={i} />)}
             </div>
           )}
         </section>

@@ -14,6 +14,7 @@ export default function Navbar() {
 
   const linkStyle = {
     color: 'var(--muted)', fontSize: 14, fontWeight: 500, textDecoration: 'none',
+    display: 'inline-flex', alignItems: 'center', minHeight: 44,
     transition: 'color 0.2s',
   } as const;
 
@@ -28,7 +29,8 @@ export default function Navbar() {
       borderBottom: scrolled || !onLanding ? '1px solid #1e1e26' : '1px solid transparent',
       transition: 'all 0.3s ease',
     }}>
-      <Link to="/" style={{ textDecoration: 'none' }}>
+      <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <img src="/logo-color.png" alt="" height={30} />
         <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>
           <span style={{ background: 'var(--gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             Jobify
@@ -48,16 +50,6 @@ export default function Navbar() {
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
         >
           Dashboard
-        </Link>
-        <Link to="/vagas" style={{
-          background: 'var(--gradient)', color: '#fff',
-          padding: '8px 18px', borderRadius: 999, fontSize: 13, fontWeight: 600,
-          textDecoration: 'none', transition: 'opacity 0.2s',
-        }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        >
-          Explorar vagas
         </Link>
       </div>
     </nav>

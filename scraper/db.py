@@ -182,12 +182,13 @@ class DbWriter:
                 cur.execute(
                     """
                     insert into job_snapshots (job_id, scrape_run_id, seniority,
-                        contract_type, remote_type, salary_min, salary_max, salary_currency)
-                    values (%s, %s, %s, %s::contract_type, %s::remote_type, %s, %s, %s)
+                        contract_type, remote_type, salary_min, salary_max, salary_currency, salary_period)
+                    values (%s, %s, %s, %s::contract_type, %s::remote_type, %s, %s, %s, %s)
                     """,
                     (job_id, run_id, _clean(row.seniority),
                      _clean(row.contract_type), _clean(row.remote_type),
-                     _clean(row.salary_min), _clean(row.salary_max), _clean(row.salary_currency)),
+                     _clean(row.salary_min), _clean(row.salary_max), _clean(row.salary_currency),
+                     _clean(row.salary_period)),
                 )
         self.conn.commit()
         return (found, new)

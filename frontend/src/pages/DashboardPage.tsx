@@ -1,276 +1,245 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
-import { getSectors, getStats } from '../api/client';
-import type { Sector, StatsDto } from '../api/types';
+import { getHomeStats, getSectors, getStats } from '../api/client';
+import type { HomeStats, Sector, StatsDto } from '../api/types';
+import ChartCard from '../components/dashboard/ChartCard';
+import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
+import HBarChart, { type HBarRow } from '../components/dashboard/HBarChart';
+import JobsOverTimeChart from '../components/dashboard/JobsOverTimeChart';
+import KpiRow from '../components/dashboard/KpiRow';
+import ModalityChart from '../components/dashboard/ModalityChart';
+import { monthsTable, toModalityRow, type SectorSeries } from '../components/dashboard/data';
+import SalaryChart from '../components/dashboard/SalaryChart';
+import { formatInt, MODALITIES } from '../components/dashboard/theme';
+import { relativeDate } from '../utils/format';
 
-const SECTOR_COLORS = ['#4f8ef7', '#a855f7', '#f59e0b'];
+interface SectorStats {
+  sector: Sector;
+  stats: StatsDto;
+}
 
-/* ── Dark-theme tooltip ── */
-function DarkTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
+const MONTHS_PER_YEAR = 14;
+const TOP_DISTRICTS = 10;
+
+function PageHeader() {
   return (
-    <div style={{
-      background: 'rgba(6,6,8,0.95)',
-      border: '1px solid var(--border)',
-      borderRadius: 8, padding: '10px 14px',
-      fontSize: 12,
-    }}>
-      <p style={{ color: 'var(--muted)', marginBottom: 6, fontWeight: 600 }}>{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.name} style={{ color: p.color, margin: '2px 0' }}>
-          {p.name}: <strong style={{ color: 'var(--text)' }}>
-            {typeof p.value === 'number' ? p.value.toLocaleString('pt-PT', { maximumFractionDigits: 0 }) : p.value}
-            {p.name.toLowerCase().includes('salário') && ' €'}
-          </strong>
-        </p>
-      ))}
-    </div>
+    <header>
+      <p className="eyebrow">Dashboard</p>
+      <h1 className="dashboard__title">O mercado de trabalho em números.</h1>
+    </header>
   );
 }
 
-/* ── Section wrapper ── */
-const ChartCard: React.FC<React.PropsWithChildren<{ title: string; subtitle?: string }>> = ({ title, subtitle, children }) => (
-  <section style={{
-    background: 'var(--surface)',
-    border: '1px solid var(--border)',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-  }}>
-    <header style={{ marginBottom: 20 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{title}</h2>
-      {subtitle && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{subtitle}</p>}
-    </header>
-    {children}
-  </section>
-);
-
 export default function DashboardPage() {
-  const [sectors, setSectors] = useState<Sector[]>([]);
-  const [statsBySector, setStatsBySector] = useState<Record<string, StatsDto>>({});
-  const [selectedSector, setSelectedSector] = useState<string>('');
+  const [data, setData] = useState<SectorStats[]>([]);
+  const [home, setHome] = useState<HomeStats | null>(null);
+  const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* ── Load sectors + fetch stats for all in parallel ── */
+  /* ── Estatísticas de todas as áreas + números globais ── */
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const sectorList = await getSectors();
-        setSectors(sectorList);
-        if (sectorList[0]) setSelectedSector(sectorList[0].slug);
-
-        const entries = await Promise.all(
-          sectorList.map(async s => {
-            try { return [s.slug, await getStats(s.slug)] as const; }
-            catch { return [s.slug, null] as const; }
-          })
-        );
-        const map: Record<string, StatsDto> = {};
-        entries.forEach(([slug, stats]) => { if (stats) map[slug] = stats; });
-        setStatsBySector(map);
-      } catch (e: any) {
-        setError(e.message);
+        const sectors = await getSectors();
+        const [homeStats, entries] = await Promise.all([
+          getHomeStats().catch(() => null),
+          Promise.all(sectors.map(async sector => {
+            try { return { sector, stats: await getStats(sector.slug) }; }
+            catch { return null; }
+          })),
+        ]);
+        if (cancelled) return;
+        /* Só as áreas com vagas ativas, da maior para a menor. */
+        const withJobs = entries
+          .filter((e): e is SectorStats => e !== null && e.stats.activeJobs > 0)
+          .sort((a, b) => b.stats.activeJobs - a.stats.activeJobs);
+        setData(withJobs);
+        setHome(homeStats);
+        setSelected(withJobs[0]?.sector.slug ?? '');
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
-  /* ── Chart 1: merge jobsOverTime from all sectors into one dataset ── */
-  const jobsOverTimeData = useMemo(() => {
-    const months = new Set<string>();
-    Object.values(statsBySector).forEach(s => s.jobsOverTime.forEach(p => months.add(p.month)));
-    return Array.from(months).sort().map(month => {
-      const row: Record<string, any> = { month };
-      sectors.forEach(s => {
-        row[s.name] = statsBySector[s.slug]?.jobsOverTime.find(p => p.month === month)?.count ?? 0;
-      });
-      return row;
-    });
-  }, [sectors, statsBySector]);
-
-  const selectedStats = statsBySector[selectedSector];
+  const sectorRows: HBarRow[] = useMemo(() => data.map(({ sector, stats }) => ({
+    label: sector.name,
+    value: stats.activeJobs,
+    tip: formatInt(stats.activeJobs),
+    detail: `${formatInt(stats.activeJobs)} vagas ativas`,
+  })), [data]);
+  const modalityRows = useMemo(() => data.map(({ sector, stats }) => toModalityRow(sector.name, stats.remoteTypes)), [data]);
+  const series: SectorSeries[] = useMemo(
+    () => data.map(({ sector, stats }) => ({ slug: sector.slug, name: sector.name, points: stats.jobsOverTime })),
+    [data],
+  );
 
   if (loading) {
     return (
-      <main style={{ paddingTop: 140, textAlign: 'center', color: 'var(--muted)' }}>
-        A carregar dashboard…
+      <main className="dashboard" aria-busy="true">
+        <div className="dashboard__inner">
+          <PageHeader />
+          <DashboardSkeleton />
+        </div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main style={{ paddingTop: 140, textAlign: 'center' }}>
-        <div style={{
-          maxWidth: 500, margin: '0 auto', padding: 20,
-          background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
-          borderRadius: 12, color: '#f87171', fontSize: 14,
-        }}>
-          Erro ao carregar dashboard: {error}
-        </div>
+      <main className="dashboard dashboard--status">
+        <div className="dashboard__error">Erro ao carregar dashboard: {error}</div>
       </main>
     );
   }
 
+  const current = data.find(d => d.sector.slug === selected);
+  const active = current?.stats.activeJobs ?? 0;
+
+  const skillRows: HBarRow[] = (current?.stats.topSkills ?? []).map(s => {
+    const pct = (s.count / active) * 100;
+    return { label: s.name, value: pct, tip: `${Math.round(pct)}%`, detail: `${formatInt(s.count)} de ${formatInt(active)} vagas` };
+  });
+  const companyRows: HBarRow[] = (current?.stats.topCompanies ?? []).map(c => ({
+    label: c.name, value: c.count, tip: formatInt(c.count), detail: `${formatInt(c.count)} vagas ativas`,
+  }));
+  const districtRows: HBarRow[] = (current?.stats.districtDistribution ?? []).slice(0, TOP_DISTRICTS).map(d => ({
+    label: d.district, value: d.count, tip: formatInt(d.count), detail: `${formatInt(d.count)} vagas ativas`,
+  }));
+
   return (
-    <main style={{ paddingTop: 100, paddingBottom: 80, minHeight: '100vh' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 2rem' }}>
+    <main className="dashboard">
+      <div className="dashboard__inner">
+        <PageHeader />
 
-        <header style={{ marginBottom: 40 }}>
-          <p style={{ fontSize: 12, letterSpacing: 4, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
-            Dashboard
-          </p>
-          <h1 style={{
-            fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 800,
-            letterSpacing: '-2px', color: 'var(--text)',
-          }}>
-            O mercado de trabalho em números.
-          </h1>
-        </header>
+        {home && (
+          <KpiRow
+            items={[
+              { label: 'Vagas ativas', value: home.activeJobs },
+              { label: 'Novas esta semana', value: home.newThisWeek },
+              { label: 'Empresas a contratar', value: home.companies },
+              { label: 'Áreas com vagas', value: data.length },
+            ]}
+            caption={home.lastUpdatedAt ? `Atualizado ${relativeDate(home.lastUpdatedAt)}.` : undefined}
+          />
+        )}
 
-        {/* ── Chart 1: jobs per sector over time (multi-line) ── */}
-        <ChartCard
-          title="Vagas por setor"
-          subtitle="Vagas ativas registadas pelo scraper, agrupadas por mês"
-        >
-          {jobsOverTimeData.length === 0 ? (
-            <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: 40 }}>
-              Sem dados históricos suficientes.
-            </p>
-          ) : (
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={jobsOverTimeData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#1e1e26" strokeDasharray="3 3" />
-                <XAxis dataKey="month" stroke="#6b6b80" fontSize={12} />
-                <YAxis stroke="#6b6b80" fontSize={12} allowDecimals={false} />
-                <Tooltip content={<DarkTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 13, color: 'var(--muted)' }} />
-                {sectors.map((s, i) => (
-                  <Line
-                    key={s.id}
-                    type="monotone"
-                    dataKey={s.name}
-                    stroke={SECTOR_COLORS[i % SECTOR_COLORS.length]}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
+        {data.length === 0 ? (
+          <p className="chart-empty">Ainda não há vagas ativas para mostrar.</p>
+        ) : (
+          <>
+            <div className="dash-grid">
+              <ChartCard
+                title="Vagas ativas por área"
+                subtitle="Quantas vagas estão abertas em cada área"
+                table={{ columns: ['Área', 'Vagas ativas'], rows: data.map(d => [d.sector.name, formatInt(d.stats.activeJobs)]) }}
+              >
+                <HBarChart rows={sectorRows} name="Vagas ativas" />
+              </ChartCard>
 
-        {/* ── Sector selector for the next two charts ── */}
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10, fontWeight: 600 }}>
-            Aprofundar num setor
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {sectors.map(s => {
-              const active = s.slug === selectedSector;
-              return (
-                <button key={s.id} onClick={() => setSelectedSector(s.slug)}
-                  style={{
-                    background: active ? 'var(--gradient)' : 'var(--surface)',
-                    color: active ? '#fff' : 'var(--text)',
-                    border: `1px solid ${active ? 'transparent' : 'var(--border)'}`,
-                    borderRadius: 999, padding: '8px 18px',
-                    fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
-                  }}
-                >
-                  {s.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+              <ChartCard
+                title="Modalidade de trabalho"
+                subtitle="Percentagem das vagas ativas, segundo o que cada anúncio indica"
+                table={{
+                  columns: ['Área', ...MODALITIES.map(m => m.label), 'Total'],
+                  rows: modalityRows.map(r => [r.sector, ...MODALITIES.map(m => formatInt(r.counts[m.key] ?? 0)), formatInt(r.total)]),
+                }}
+              >
+                <ModalityChart rows={modalityRows} />
+              </ChartCard>
+            </div>
 
-        {/* ── Two side-by-side charts ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 24 }}>
+            <ChartCard
+              title="Vagas por área ao longo do tempo"
+              subtitle="Vagas ativas registadas em cada mês de recolha"
+              table={{
+                columns: ['Mês', ...series.map(s => s.name)],
+                rows: monthsTable(series).map(row => [String(row.month), ...series.map(s => (row[s.slug] == null ? '—' : formatInt(Number(row[s.slug]))))]),
+              }}
+            >
+              <JobsOverTimeChart series={series} />
+            </ChartCard>
 
-          {/* Chart 2: salary evolution */}
-          <ChartCard
-            title="Evolução salarial"
-            subtitle={selectedStats
-              ? `Média mensal · cobertura de ${(selectedStats.salaryCoverage * 100).toFixed(0)}% das vagas`
-              : ''
-            }
-          >
-            {!selectedStats || selectedStats.salaryEvolution.length === 0 ? (
-              <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: 40 }}>
-                Sem vagas com salário publicado neste setor.
-              </p>
-            ) : (
-              <>
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={selectedStats.salaryEvolution} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="salaryMax" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="salaryMin" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#4f8ef7" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#4f8ef7" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#1e1e26" strokeDasharray="3 3" />
-                    <XAxis dataKey="month" stroke="#6b6b80" fontSize={12} />
-                    <YAxis stroke="#6b6b80" fontSize={12}
-                      tickFormatter={v => `${(v / 1000).toFixed(1)}k`} />
-                    <Tooltip content={<DarkTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 13, color: 'var(--muted)' }} />
-                    <Area type="monotone" dataKey="avgMax" name="Salário máx (€)"
-                      stroke="#22c55e" fill="url(#salaryMax)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="avgMin" name="Salário mín (€)"
-                      stroke="#4f8ef7" fill="url(#salaryMin)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-                <p style={{
-                  fontSize: 12, color: 'var(--muted)',
-                  marginTop: 12, padding: '10px 14px',
-                  background: 'var(--bg)', border: '1px solid var(--border)',
-                  borderRadius: 8, lineHeight: 1.5,
-                }}>
-                  ⚠ Baseado apenas nas vagas que publicam salário
-                  ({(selectedStats.salaryCoverage * 100).toFixed(0)}% do total). Valores em euros brutos anuais.
-                </p>
-              </>
-            )}
-          </ChartCard>
+            <section className="dash-section" aria-labelledby="dash-deep-dive">
+              <div className="dash-section__header">
+                <h2 id="dash-deep-dive" className="dash-section__title">Aprofundar numa área</h2>
+                <div className="sector-pills" role="group" aria-label="Área">
+                  {data.map(({ sector, stats }) => (
+                    <button
+                      key={sector.slug}
+                      type="button"
+                      aria-pressed={sector.slug === selected}
+                      onClick={() => setSelected(sector.slug)}
+                    >
+                      {sector.name}
+                      <span className="sector-pills__count">{formatInt(stats.activeJobs)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Chart 3: district distribution */}
-          <ChartCard
-            title="Distribuição geográfica"
-            subtitle="Vagas ativas por distrito"
-          >
-            {!selectedStats || selectedStats.districtDistribution.length === 0 ? (
-              <p style={{ color: 'var(--muted)', fontSize: 14, textAlign: 'center', padding: 40 }}>
-                Sem dados geográficos.
-              </p>
-            ) : (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={selectedStats.districtDistribution.slice(0, 10)}
-                  margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                  layout="vertical"
-                >
-                  <CartesianGrid stroke="#1e1e26" strokeDasharray="3 3" horizontal={false} />
-                  <XAxis type="number" stroke="#6b6b80" fontSize={12} allowDecimals={false} />
-                  <YAxis type="category" dataKey="district" stroke="#6b6b80" fontSize={12} width={90} />
-                  <Tooltip content={<DarkTooltip />} cursor={{ fill: 'rgba(79,142,247,0.08)' }} />
-                  <Bar dataKey="count" name="Vagas" fill="#4f8ef7" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </ChartCard>
+              {current && (
+                <div className="dash-grid">
+                  <ChartCard
+                    title="Competências mais pedidas"
+                    subtitle={`Percentagem das ${formatInt(active)} vagas que pedem cada competência`}
+                    table={{
+                      columns: ['Competência', 'Vagas', '% das vagas'],
+                      rows: current.stats.topSkills.map(s => [s.name, formatInt(s.count), `${Math.round((s.count / active) * 100)}%`]),
+                    }}
+                  >
+                    {skillRows.length > 0
+                      ? <HBarChart rows={skillRows} name="Vagas" />
+                      : <p className="chart-empty">Sem competências identificadas nesta área.</p>}
+                  </ChartCard>
 
-        </div>
+                  <ChartCard
+                    title="Quem está a contratar"
+                    subtitle="Empresas com mais vagas ativas nesta área"
+                    table={{ columns: ['Empresa', 'Vagas'], rows: current.stats.topCompanies.map(c => [c.name, formatInt(c.count)]) }}
+                  >
+                    {companyRows.length > 0
+                      ? <HBarChart rows={companyRows} name="Vagas" maxLabelChars={26} />
+                      : <p className="chart-empty">Sem empresas identificadas nesta área.</p>}
+                  </ChartCard>
+
+                  <ChartCard
+                    title="Evolução salarial"
+                    subtitle="Média das vagas com salário publicado, por mês de recolha"
+                    table={{
+                      columns: ['Mês', 'Mínimo (€/mês)', 'Máximo (€/mês)', 'Mínimo (€/ano)', 'Máximo (€/ano)'],
+                      rows: current.stats.salaryEvolution.map(p => [
+                        p.month,
+                        p.avgMin == null ? '—' : formatInt(p.avgMin / MONTHS_PER_YEAR),
+                        p.avgMax == null ? '—' : formatInt(p.avgMax / MONTHS_PER_YEAR),
+                        p.avgMin == null ? '—' : formatInt(p.avgMin),
+                        p.avgMax == null ? '—' : formatInt(p.avgMax),
+                      ]),
+                    }}
+                  >
+                    {current.stats.salaryEvolution.length > 0
+                      ? <SalaryChart data={current.stats.salaryEvolution} coverage={current.stats.salaryCoverage} />
+                      : <p className="chart-empty">Ainda não há vagas com salário publicado nesta área.</p>}
+                  </ChartCard>
+
+                  <ChartCard
+                    title="Distribuição geográfica"
+                    subtitle="Vagas ativas por distrito"
+                    table={{ columns: ['Distrito', 'Vagas'], rows: current.stats.districtDistribution.map(d => [d.district, formatInt(d.count)]) }}
+                  >
+                    {districtRows.length > 0
+                      ? <HBarChart rows={districtRows} name="Vagas" />
+                      : <p className="chart-empty">Sem dados geográficos nesta área.</p>}
+                  </ChartCard>
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
